@@ -8,7 +8,7 @@ import { createModels } from "@earendil-works/pi-ai/models";
 import { createRegistry, Harness, MemoryStorage } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import type { Conversation, ToolExecutionApi, ToolRegistration } from "@earendil-works/pi-durable";
-import type { Command, CommandContext, Host, Web, WebHandler, WebRequest } from "../_pocket.d.ts";
+import type { Command, CommandContext, Host, Web, ConversationWebRequest } from "../_pocket.d.ts";
 import setup from "../decision-notebook.ts";
 import {
     NotebookDoc,
@@ -17,6 +17,7 @@ import {
     propose,
     approve,
     validateContent,
+    editProposal,
 } from "../decision-notebook/state.ts";
 
 const content = {
@@ -31,16 +32,17 @@ const owner = { id: "owner-id", name: "Owner", role: "owner" as const };
 
 function moduleHarness() {
     const commands = new Map<string, Command>();
-    let read: WebHandler;
+    const routes = new Map<string, (request: ConversationWebRequest) => unknown>();
     let fenced = false;
     const web = {
         api: 1,
         module: "decision-notebook",
         client: (_entry, access) => assert.equal(access?.access, "owner"),
-        route: (method, _path, handler, access) => {
-            assert.equal(method, "GET");
-            assert.equal(access?.access, "owner");
-            read = handler;
+        route: () => assert.fail("Use conversation-bound routes"),
+        conversationRoute: (method, _path, handler, access) => {
+            assert.equal(access.conversation, "source");
+            assert.equal(access.access, "owner");
+            routes.set(method, handler);
         },
         command: (name, command) => commands.set(name, command),
         error: (status, message) => Object.assign(new Error(message), { status }),
@@ -59,7 +61,8 @@ function moduleHarness() {
 
     return {
         commands,
-        read: (request: WebRequest) => read(request),
+        read: (request: ConversationWebRequest) => routes.get("GET")!(request),
+        write: (request: ConversationWebRequest) => routes.get("POST")!(request),
         tools: extension.tools! as readonly ToolRegistration[],
         fenced: () => fenced,
     };
@@ -132,20 +135,29 @@ test("safe tool replay stays one proposal across SQLite reopen, isolated from ot
     }
 });
 
-test("only owner commands approve; concurrent stale approval fails and supersession retains accepted contents", async () => {
+test("fresh owner actions guard revisions, preserve accepted history and retain withdrawn replay IDs", async () => {
     const harness = await Harness.open(new MemoryStorage(), options(), context);
 
     try {
         const root = await harness.root(context);
         const module = moduleHarness();
         const ctx = commandContext(harness, root);
+        const source = {
+            id: root.id,
+            title: "Local index",
+            cwd: "/not-read",
+            thinkingLevel: "off" as const,
+        };
         const request = {
-            params: { conversation: String(root.id) },
-            user: owner,
-        } as unknown as WebRequest;
+            ...ctx,
+            conversation: source,
+            body: {},
+            params: { source: String(root.id) },
+        } as unknown as ConversationWebRequest;
         const ids = ["a", "b", "c"].map((letter) => `d-${letter.repeat(32)}`);
+        const write = (body: Record<string, unknown>) =>
+            module.write({ ...request, body: { source, ...body } });
 
-        assert.throws(() => module.read(request), /decision-notebook-open/);
         await root.commit(async (tx) => {
             const book = await tx.doc(NotebookDoc, root.id);
 
@@ -153,24 +165,34 @@ test("only owner commands approve; concurrent stale approval fails and supersess
                 propose(book, id, validateContent(content), "2026-10-18T00:00:00.000Z");
             }
         }, context);
-        const accept = module.commands.get("decision-notebook-accept")!.handler;
-
+        assert.equal(
+            ((await module.read(request)) as { book: { revision: number } }).book.revision,
+            3,
+        );
         await assert.rejects(
-            async () => accept(`${ids[0]} 3`, { ...ctx, user: { ...owner, role: "guest" } }),
+            async () => module.write({ ...request, user: { ...owner, role: "guest" } }),
             /Only the owner/,
         );
-        const approvals = await Promise.allSettled([
-            accept(`${ids[0]} 3`, ctx),
-            accept(`${ids[1]} 3`, ctx),
-        ]);
+        await assert.rejects(
+            async () =>
+                write({
+                    source: { ...source, cwd: "/changed" },
+                    action: "accept",
+                    id: ids[0],
+                    revision: 3,
+                }),
+            /source conversation changed/,
+        );
+        const approvals = await Promise.allSettled(
+            ids.slice(0, 2).map((id) => write({ action: "accept", id, revision: 3 })),
+        );
 
         assert.equal(approvals.filter((result) => result.status === "fulfilled").length, 1);
         const before = (await harness.snapshot(NotebookDoc, root.id, context))!;
         const accepted = before.decisions.find((decision) => decision.accepted)!;
         const next = before.decisions.find((decision) => !decision.accepted)!;
-        const supersede = module.commands.get("decision-notebook-supersede")!.handler;
 
-        await supersede(`${accepted.id} ${next.id} 4`, ctx);
+        await write({ action: "accept", id: next.id, replaces: accepted.id, revision: 4 });
         const after = (await harness.snapshot(NotebookDoc, root.id, context))!;
 
         assert.deepEqual(
@@ -181,14 +203,37 @@ test("only owner commands approve; concurrent stale approval fails and supersess
             after.decisions.find((decision) => decision.id === accepted.id)?.supersededBy,
             next.id,
         );
-        await module.commands.get("decision-notebook-open")!.handler("", ctx);
-        const view = module.read(request) as { book: typeof after };
+        await assert.rejects(
+            async () => write({ action: "edit", id: accepted.id, content, revision: 5 }),
+            /Only a pending/,
+        );
+        const pending = after.decisions.find((decision) => !decision.accepted)!;
 
-        view.book.decisions.length = 0;
-        assert.equal((await harness.snapshot(NotebookDoc, root.id, context))!.decisions.length, 3);
-        assert.throws(
-            () => module.read({ ...request, user: { ...owner, id: "another-owner" } }),
-            /decision-notebook-open/,
+        await write({
+            action: "edit",
+            id: pending.id,
+            content: { ...content, title: "Edited by owner" },
+            revision: 5,
+        });
+        await write({ action: "withdraw", id: pending.id, revision: 6 });
+        await root.commit(async (tx) => {
+            const book = await tx.doc(NotebookDoc, root.id);
+
+            propose(book, pending.id, validateContent(content), "2026-10-18T00:00:00.000Z");
+        }, context);
+        const final = (await harness.snapshot(NotebookDoc, root.id, context))!;
+
+        assert.equal(final.decisions.length, 3);
+        assert.equal(final.revision, 7);
+        assert.equal(
+            final.decisions.find((decision) => decision.id === pending.id)?.withdrawn?.by,
+            owner.id,
+        );
+        // Compatibility commands still use the same atomic guards, never a model acceptance tool.
+        await assert.rejects(
+            async () =>
+                module.commands.get("decision-notebook-accept")!.handler(`${pending.id} 6`, ctx),
+            /notebook changed/,
         );
     } finally {
         await harness.close(context);
@@ -198,6 +243,8 @@ test("only owner commands approve; concurrent stale approval fails and supersess
 test("invalid dates fail cleanly; a proposal at capacity can still be accepted", () => {
     assert.throws(() => validateContent({ ...content, revisitDate: "2026-99-99" }), NotebookError);
     const book = emptyNotebook();
+
+    book.revision = Number.MAX_SAFE_INTEGER - 1000;
     const large = validateContent({
         ...content,
         rationale: "r".repeat(2400),
@@ -214,10 +261,23 @@ test("invalid dates fail cleanly; a proposal at capacity can still be accepted",
             );
         }
     }, /notebook is full/);
+    editProposal(book, book.decisions[0]!.id, book.revision, large);
+
     for (const decision of book.decisions) {
-        approve(book, decision.id, book.revision, "o".repeat(160), "2026-10-18T00:00:00.000Z");
+        approve(
+            book,
+            decision.id,
+            book.revision,
+            "\ud800".repeat(160),
+            "+999999-12-31T23:59:59.999Z",
+        );
     }
 
     assert.ok(book.decisions.every((decision) => decision.accepted));
     assert.ok(JSON.stringify(book).length <= 180000);
+    book.revision = Number.MAX_SAFE_INTEGER;
+    assert.throws(
+        () => propose(book, `d-${"f".repeat(32)}`, large, "2026-10-18T00:00:00.000Z"),
+        /revision limit/,
+    );
 });

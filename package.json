@@ -1,6 +1,6 @@
 {
     "name": "pi-pocket-decision-notebook",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "private": true,
     "type": "module",
     "description": "Conversation decisions with Pi proposals and explicit human approval.",
@@ -11,7 +11,8 @@
     },
     "scripts": {
         "check": "tsc --noEmit -p tsconfig.json",
-        "test": "node --test test/*.test.ts"
+        "test": "node --test test/*.test.ts",
+        "format:check": "prettier --check --tab-width 4 --print-width 100 decision-notebook.ts decision-notebook/state.ts decision-notebook/index.js decision-notebook/style.css test/notebook.test.ts _pocket.d.ts README.md package.json"
     },
     "peerDependencies": {
         "@earendil-works/pi-ai": "^1.1.0",
@@ -22,6 +23,7 @@
         "@earendil-works/pi-coding-agent": "1.1.0",
         "@types/node": "^26.6.5",
         "preact": "^11.0.1",
+        "prettier": "^3.8.0",
         "typescript": "^6.0.3"
     },
     "repository": {

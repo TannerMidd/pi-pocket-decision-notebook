@@ -1,90 +1,110 @@
 # Decision notebook for Pi Pocket
 
-Keep the reason for each project choice beside the conversation that made it. Pi can propose and search. The owner must accept each proposal. A new proposal can replace an accepted decision without changing its original contents.
+Record a choice and its reasons in the conversation that made it. Pi can propose and search. **Only the owner can accept or supersede a decision.** Accepted contents stay unchanged. A replacement keeps the previous decision and its approval history.
 
-**Local first.** No accounts, external services, network requests, shell commands, or outside file reads. Requires Pi Pocket 0.14.0 or later (extension API 1), with its supplied Pi AI and Pi Durable 1.1 packages. Checked with Pocket 0.15.0 and Node 26.8.2.
+Version **0.2.0** requires **Pi Pocket 0.16.0 or later**, extension API **1**, and Pocket's supplied Pi AI / Pi Durable 1.1 packages. No external service, model call, shell command, credential access, or outside file read is needed to use the owner review UI.
 
-## Install
+## Install or update
 
-1. In Pi Pocket, open **Menu → Extensions**. Local drop-ins appear here after their files are in the data folder.
-2. Copy `decision-notebook.ts` and the complete `decision-notebook/` folder into that data folder's `extensions/` directory. Keep their names and layout. The default is `~/.pi-pocket/extensions/`; `PI_POCKET_DIR` can select another data folder. The launcher shows the current **Data** folder.
-3. Read these files before you turn the extension on. In **Menu → Extensions**, turn on **Decision notebook** (`decision-notebook.ts`).
+For gallery releases, open **Menu → Extensions → Find extensions**, then select **Decision notebook**. Check the version, read its files, and install it. Only the owner can turn it on in **Menu → Extensions**. Gallery updates are a separate, explicit owner action; a source change in this repository does not publish a gallery update.
 
-Do not copy `node_modules`, tests, package files, or the development type declaration into the extension folder. Pocket supplies its packages and `_pocket.d.ts`. This repository is ready for the gallery file layout but is **not published** and has no gallery entry yet.
+For a manual install of this source:
+
+1. Copy these three runtime files into the current Pocket data folder's `extensions/` directory, with this layout:
+
+    ```text
+    extensions/
+      decision-notebook.ts
+      decision-notebook/
+        index.js
+        style.css
+    ```
+
+2. Read the files, then turn on **Decision notebook** in **Menu → Extensions**. The default data folder is `~/.pi-pocket/`; the launcher shows the current **Data** folder.
+
+Do not copy `node_modules`, tests, package files, or `_pocket.d.ts`. Pocket supplies its packages and public type declarations. `decision-notebook/state.ts` is an editor/test compatibility shim, not a production dependency. An old installed copy may remain; the 0.2 entry does not import it.
+
+Update Pocket to 0.16.0 first. All server runtime helpers are inline in `decision-notebook.ts`, so an enabled 0.1 → 0.2 extension update does not depend on a cached helper or require a Pocket restart. Pocket can briefly show the new client with the old backend while files load. The client checks both the Pocket version and notebook response protocol, and refuses actions until they match. Choose **Review pending decision** again, or **Refresh** on an open notebook, after the update completes.
 
 ## Use
 
-1. Open a conversation. Ask Pi to record a proposal, for example:
+1. After Pi proposes a decision, stay in the conversation and open **Menu → Review pending decision**, or use that launcher action (Ctrl+K / ⌘+K). This reads the current source fresh and opens its newest pending proposal directly in the review sheet. No notebook page, command, or snapshot preparation is needed.
+2. Check the source title, conversation ID, and working folder. **Each notebook belongs only to that conversation.** Other conversations in the same folder do not share it.
+3. Read the choice, rationale, alternatives, and optional revisit date. The notebook rail badge and review menu hint show the current conversation's pending count. Updates recover while the tab is visible even when the notebook page is closed. **Menu → Decision notebook**, its rail button, or its launcher action opens search and history; select any row there to review that particular decision.
+4. Use **Save edits** to change a pending proposal. Saving never accepts it. Use **Accept decision** only when you agree. Accepted content is read-only.
+5. To replace a decision, review a new pending proposal, select the accepted decision to replace, and read the displayed old contents. **Accept and supersede** accepts the new proposal and marks the previous one superseded in one atomic commit. The old text and approval metadata stay unchanged.
 
-    > Propose using SQLite for this project's local index. Include the reasons, JSONL as an alternative, and a revisit date of 2027-02-28. Use the decision notebook tool.
+To create a proposal yourself, open **Menu → Decision notebook → New proposal**. Save it first, then review and accept it separately. Pi can also create one when asked, for example:
 
-2. As the owner, send **`/decision-notebook-open`** in that conversation. This binds and refreshes its read-only notebook snapshot.
-3. Open **Menu → Decision notebook**, or tap its rail button. It is also in the launcher (Ctrl+K / ⌘+K).
-4. Search or filter by pending, accepted, superseded, or revisit due. Read the full choice, reason, and alternatives before approval.
-5. Tap **Copy accept command**. Close the page, paste the command into the **same conversation shown on the page**, and send it yourself. Copying does not approve anything. If clipboard access is blocked, select and copy the command from the text box.
-6. To replace an accepted decision, first ask Pi for a new proposal. On that proposal's card, select the accepted decision, then tap **Copy supersede command**. Paste and send it in the same conversation. The command accepts the new proposal and marks the old decision as superseded in one commit.
-7. Use **Export Markdown** to see the complete notebook, including all states. **Copy Markdown** copies it. The text box also supports manual selection and copying. Export does not send data to another service or write a server file.
+> Propose SQLite for this conversation's local index. Include the reasons, JSONL as an alternative, and a revisit date of 2027-02-28. Use the decision notebook tool.
 
-Revisit badges use the current UTC calendar date. They are not reminders and do not start Pi. No decisions are changed merely because a date is due.
+**Withdraw proposal** removes a pending proposal from active consideration after confirmation. It does not delete its text or ID. Withdrawn proposals cannot be edited or accepted, and still count toward the notebook limit. There is no model tool to edit, withdraw, accept, or supersede.
 
-### Human commands
+Search and filter by pending, accepted, superseded, withdrawn, or revisit due. Revisit badges use the current **UTC** date. They are not reminders, and do not start Pi or change decisions. **Export** opens complete Markdown for all states at the displayed revision. Copy it, or select the text manually if the clipboard is unavailable. Export sends nothing to an external service and writes no server file.
 
-| Command                                                               | Effect                                                             |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `/decision-notebook-open`                                             | Bind/refresh this conversation's UI snapshot.                      |
-| `/decision-notebook-accept <proposal-id> <revision>`                  | Accept a pending proposal.                                         |
-| `/decision-notebook-supersede <accepted-id> <proposal-id> <revision>` | Accept the new proposal and retain the old decision as superseded. |
+### Stale reviews and local drafts
 
-These are conversation commands, checked by Pocket for session access and by this extension for the **owner** role. Guests and viewers cannot open or approve through these commands. Approval commands use the notebook revision shown in the page. If another proposal or approval changes the notebook, an old command fails without a partial change. Run `/decision-notebook-open`, review the new snapshot, and copy a new command. A repeated acceptance command also fails rather than applying twice.
+Reads are fresh, not a server cache. A review sheet keeps the source, proposal ID, and revision that it displays. Events, focus/online recovery, and a visible-tab reconciliation read keep reviews and the pending hint current, including while you stay in chat with the notebook closed. Missed events do not grant authority. No proposal opens a sheet by itself; only your review action does.
+
+If the notebook, title, or folder changes, actions stop. **Review latest · keep edits** loads the current review baseline without silently replacing dirty fields. Compare your edits with the saved proposal before saving. If a supersession target is no longer accepted, the selection is cleared and you must choose again. A stale concurrent action fails without a partial change.
+
+Edits are kept in this tab's **session storage**, under `x.decision-notebook.*` keys, separated by owner, conversation, and proposal. They survive closing the sheet, conversation navigation, and a page reload in the same tab. Reopen the same proposal (or **New proposal** for an unsaved new one). Drafts are not synced to other tabs or devices and may be lost when the tab is closed. A storage failure shows a warning; keep the sheet open or copy your edits then. **Discard local edits** clears them explicitly. Drafts from a proposal accepted or withdrawn elsewhere are retained, but cannot change its saved contents.
+
+### Compatibility commands
+
+The normal owner flow uses buttons, not slash commands. These older conversation commands remain available:
+
+| Command                                                               | Effect                                                            |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `/decision-notebook-open`                                             | Open the current notebook in matching visible owner tabs.         |
+| `/decision-notebook-accept <proposal-id> <revision>`                  | Accept a pending proposal at the exact current revision.          |
+| `/decision-notebook-supersede <accepted-id> <proposal-id> <revision>` | Accept a proposal and retain the previous decision as superseded. |
+
+Pocket checks conversation access; the extension also checks the authenticated **owner** role. A repeated or stale acceptance command fails. Review the latest notebook before trying again. There is no automatic approval policy or background acceptance.
 
 ### Pi tools
 
-- **`decision_notebook_propose`**: title, `chosenOption`, rationale, optional alternatives, optional `revisitDate` (`YYYY-MM-DD`). Creates one pending proposal in the calling conversation. Replaying the same durable tool call cannot create a second entry.
-- **`decision_notebook_list`**: optional `query`, `status` (`all`, `proposal`, `accepted`, `superseded`, `revisit`), and `offset`. Returns up to 20 matching entries. Only this read tool has `readOnlyHint` and can run in Plan mode.
+- **`decision_notebook_propose`**: title, `chosenOption`, rationale, optional alternatives, and optional `revisitDate` (`YYYY-MM-DD`). Creates one pending proposal in the calling conversation. A replay of the same durable tool call cannot create another entry, including after that proposal is withdrawn.
+- **`decision_notebook_list`**: optional `query`, `status` (`all`, `proposal`, `accepted`, `superseded`, `withdrawn`, `revisit`), and `offset`. Returns up to 20 matches. Only this read tool has `readOnlyHint` and can run in Plan mode.
 
-Neither tool accepts a conversation ID, file path, project folder, or approval action. Authorized guests can ask Pi to use these tools in their conversation. They cannot approve with the notebook tools. Tool results go to the model provider; they can include decision text and the approving person's ID. The list labels notes as untrusted data, and fences them with `host.text.defang`. Notes must not be followed as instructions.
+Neither tool accepts a conversation ID, file path, folder, or approval action. Authorized guests can ask Pi to use the tools in their conversation, but cannot approve. Tool results go to the model provider and may contain decision text and approving person IDs. List output is labelled as untrusted data and fenced with `host.text.defang`. Notes are data, not instructions.
 
-## Data and access
+## Data, API, and access
 
-- Authority is **one native Pi Durable document per conversation**, kind `x.decision-notebook.notebook`, version 1. It uses `history: "latest"` and `fork: "initial"`. **A fork starts with an empty notebook**; it does not inherit decisions or approvals.
-- The extension does not scan transcripts, files, other conversations, or project folders. A shared working directory does not give shared notebook access. There is no global search.
-- Accepted content fields cannot be edited or deleted through this extension. Supersession adds a link and keeps the old content, acceptance time, and approving person ID. A new proposal is required for new contents. There is no proposal edit/delete action either.
-- The page and its only route are **owner-only**. The owner runs the open command in an authorized conversation before its snapshot is available. The route also checks the owner role and that the binding belongs to that person's ID. Guests with access to all sessions still cannot use the page. Session-limited invitees cannot load module pages/routes under Pocket's current API.
-- `GET /api/x/decision-notebook/notebook/:conversation` returns a copied read-only snapshot and its Markdown. It has no mutation operation. The usual Pocket sign-in and `X-Pocket` header checks apply. The browser uses only `pocket.api` to this own route and public `pocket` UI methods.
-- No local/session browser storage is used. A bound snapshot is kept in server memory for up to 50 conversation/person bindings; the oldest binding is removed when that limit is reached. It contains only this module's own decision data. It is not the source of truth. Active tools and commands refresh an existing binding after a commit, with revision ordering and a targeted change event. The page shows the copied revision and snapshot time.
-- Extension reload, disable, or server restart discards these UI copies, **not the durable notebook**. Run the open command again. **Reload snapshot** reads the current copy only; it cannot read a Durable document directly. Reopening/refreshing with the command is the recovery path if an update is missed.
-
-### Public API constraint
-
-The public `Host` API has no database/session resolver. A route request has no conversation context, document reader, or commit function. The browser cannot invoke a human command through the public extension API. This module does not bypass those limits.
-
-Instead, tools and human commands use their supported document APIs. The explicit open command creates a derived, user-bound read-only copy for the UI. The page generates approval commands for the human to send. It does **not** retain a command's commit function, use host internals, call Pocket's private HTTP API, open a second database, read credentials, or accept a browser-provided working directory.
+- Authority is one native Pi Durable document per conversation: kind `x.decision-notebook.notebook`, version **1**, scope `conversation`, history `latest`, fork `initial`. These stored settings are unchanged from 0.1. **Forks start with an empty notebook**; they do not inherit decisions or approvals.
+- The extension does not scan transcripts, files, other conversations, or project folders. There is no folder-wide or global decision search.
+- The owner-only client uses public `pocket` UI and API methods. The server uses Pocket 0.16's public **conversation-bound request** `snapshot`, `context`, and `commit` APIs. It does not retain request contexts or commit functions, use private endpoints, inspect the database/config/tokens, or impersonate a person.
+- `GET /api/x/decision-notebook/notebook/:source` reads the fresh document, source title/folder, and Markdown. `POST` at the same route creates, edits, withdraws, or accepts a proposal. Each write includes the displayed source metadata and exact notebook revision. Supersession includes the target ID. Revision and content-state checks and document edits are in one transaction. Source comparisons use the fresh bound request metadata. Writes are awaited before returning.
+- Both routes and the browser module have `access: "owner"`. Pocket checks sign-in, `X-Pocket`, source visibility, and (for writes) steering and the current turn. Guests, viewers, and session-limited invitees cannot use these owner routes or UI. Browser-provided folder/title values are comparison values, never authority.
+- Accepted contents cannot be edited or deleted. Supersession adds only the replacement link. Pending edits and withdrawals are human actions; withdrawals add metadata and retain the ID for replay detection. No IDs or accepted history are pruned.
+- Disabling/removing the extension does not remove its durable documents. There is no authoritative server cache to lose on reload or restart.
 
 ### Limits and security boundary
 
-- At most **100 decisions** and **180,000 UTF-16 code units of complete serialized document JSON**, including IDs and metadata, per conversation. Proposal admission reserves worst-case future acceptance and supersession metadata for every entry, so existing proposals remain approvable when proposal capacity is full. New proposals that exceed this reserved bound fail. Export or start a new conversation when full; this version cannot prune entries.
-- Title: 160 characters; chosen option: 1,000; rationale: 2,400; at most four alternatives of 500 each. Title, choice, rationale, and each provided alternative must not be blank. Revisit dates must be real dates. Search is limited to 160 characters. Control characters are refused (tab and line breaks are allowed).
-- All version checks, approvals, and supersession links are in one transaction. Proposal IDs derive from the durable task and call IDs and remain stored for replay detection. Cache writes reject older revisions.
-- The owner can still change or delete data through shell access, disable the extension, or remove a conversation through Pocket itself. Other server extensions run with the same OS rights. This is **not** a tamper-proof audit log or a security boundary against a compromised owner, another module, or Pi with unrestricted shell/credential access. Human-only approval here means there is no model approval tool and notebook approval commands check the authenticated owner.
-- Disabling/removing the extension does not remove stored documents. Back up Pocket data through your normal backup process. No secret should be put in a decision if it must not reach the model provider or people who can read that conversation.
+New human proposals use 16 cryptographic random bytes from `crypto.getRandomValues`, including on plain-HTTP LAN connections. Recovered drafts keep their existing IDs. If secure ID generation fails, the review sheet shows an error and no proposal is saved; there is no `Math.random` fallback.
+
+At most **100 entries** and **180,000 UTF-16 code units of serialized document JSON**, including IDs and metadata, per conversation. New proposals and pending edits reserve worst-case future approval/withdrawal/supersession metadata and the full safe-integer revision width. Editing no longer relies on the old 200-revision assumption. Existing data is not migrated or pruned. The revision counter stops safely at `Number.MAX_SAFE_INTEGER`; it cannot wrap or lose exactness. Use a new conversation when full.
+
+Title: 160 characters; chosen option: 1,000; rationale: 2,400; at most four alternatives of 500 each. Title, choice, rationale, and provided alternatives cannot be blank. The owner form uses one alternative per line. Revisit dates must be real dates. Search is limited to 160 characters. Control characters are refused except tabs and line breaks.
+
+This is **not a tamper-proof audit log**. The owner can change data through shell access or remove a conversation in Pocket. Other server extensions have the same OS rights. Pi with unrestricted shell or credentials is outside this extension's boundary. Human-only approval means the model tools have no acceptance operation and owner mutations check the authenticated person, not text that claims to be the owner. Do not record secrets that must not reach the model provider or people who can read the conversation.
 
 ## Development
 
-Use Node 22.19 or later with built-in TypeScript stripping. From this repository:
+Use Node **22.19 or later** with built-in TypeScript stripping:
 
 ```sh
 npm install
 npm run check
 npm test
+npm run format:check
+node --check decision-notebook.ts
+node --check decision-notebook/index.js
 ```
 
-The dependency list supplies development types and Pocket's public packages; no global tools are required. `_pocket.d.ts` is a development copy of Pocket's exact public declarations. Refresh it from the Pocket version you target. It is type-only and is not part of the gallery runtime payload. `npm run check` checks the module, runtime helper, browser JavaScript, declarations, and tests with `tsconfig.json`.
+A gitignored `node_modules` link to a matching Pocket checkout can replace `npm install`. `_pocket.d.ts` is the exact public declaration from Pocket 0.16.0, used only for development. The check covers the server, shim, browser JavaScript, and tests. Runtime imports are only supported package names and Node's crypto module; no machine-specific path ships.
 
-When developing next to an existing Pocket checkout, a gitignored `node_modules` symlink to that checkout's dependencies is an alternative to `npm install`. The runtime code has no machine-specific imports.
-
-The three lean tests use only public package APIs: SQLite reopen/replay and conversation isolation; owner approval/version/supersession and snapshot boundaries; malformed dates and the exact document size bound. They use temporary storage, no model provider and no live Pocket data. No browser tests are bundled. A manual smoke test on an isolated Pocket 0.15 copy checked desktop/mobile layout, a tool-created proposal, the copied approval command, and owner acceptance. Separate HTTP checks confirmed that guests and viewers cannot reach the route. Recheck the page on an **isolated Pocket copy** before sharing a changed version. Set `PI_POCKET_DIR` to a new temporary data folder if you run a separate Pocket server; do not test on an owner's install.
-
-A helper `.ts` change needs a Pocket restart after installation, as described in Pocket's drop-in docs. Ask the owner to use **Menu → Restart server**. Never restart their server from this repository's tests.
+Three lean fixtures check SQLite reopen/replay and conversation isolation; fresh owner mutation/revision/supersession/withdrawal guards; and malformed dates plus worst-case capacity at a large revision. They use temporary storage with no live data or model provider. Browser/runtime smoke checks must also use an isolated Pocket copy and scripted provider, not the owner's install. Desktop or 390px emulation is not physical-phone testing or proof of real-model behavior.
 
 ## License
 
