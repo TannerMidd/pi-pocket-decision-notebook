@@ -1,0 +1,31 @@
+{
+    "name": "pi-pocket-decision-notebook",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Conversation decisions with Pi proposals and explicit human approval.",
+    "license": "MIT",
+    "author": "Tanner Middleton",
+    "engines": {
+        "node": ">=22.19"
+    },
+    "scripts": {
+        "check": "tsc --noEmit -p tsconfig.json",
+        "test": "node --test test/*.test.ts"
+    },
+    "peerDependencies": {
+        "@earendil-works/pi-ai": "^1.1.0",
+        "@earendil-works/pi-durable": "^1.1.0"
+    },
+    "devDependencies": {
+        "@earendil-works/chord": "1.1.0",
+        "@earendil-works/pi-coding-agent": "1.1.0",
+        "@types/node": "^26.6.5",
+        "preact": "^11.0.1",
+        "typescript": "^6.0.3"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/TannerMidd/pi-pocket-decision-notebook.git"
+    }
+}

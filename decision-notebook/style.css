@@ -1,0 +1,182 @@
+.dn-page {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 20px 16px 64px;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+.dn-page * {
+    box-sizing: border-box;
+}
+.dn-intro {
+    margin-bottom: 24px;
+}
+.dn-intro h2 {
+    margin: 6px 0 10px;
+    font-size: clamp(24px, 4vw, 34px);
+    line-height: 1.2;
+}
+.dn-eyebrow {
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    font-weight: 700;
+}
+.dn-help,
+.dn-command,
+.dn-export {
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    margin: 16px 0;
+}
+.dn-help p {
+    margin: 8px 0 0;
+    line-height: 1.55;
+}
+.dn-toolbar,
+.dn-summary,
+.dn-badges {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.dn-toolbar {
+    margin: 20px 0;
+}
+.dn-page .button {
+    min-height: 44px;
+    white-space: normal;
+}
+.dn-summary {
+    margin-top: 22px;
+}
+.dn-summary span {
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    font-size: 13px;
+}
+.dn-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 12px;
+    margin: 20px 0;
+}
+.dn-page label {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+}
+.dn-page input,
+.dn-page select,
+.dn-page textarea {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 16px;
+}
+.dn-page textarea {
+    font-family: monospace;
+    font-size: 13px;
+    resize: vertical;
+    margin: 10px 0;
+    line-height: 1.6;
+}
+.dn-page :is(input, select, textarea, button):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+.dn-list {
+    display: grid;
+    gap: 16px;
+}
+.dn-decision {
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--card);
+    min-width: 0;
+}
+.dn-decision h3 {
+    margin: 14px 0 6px;
+    font-size: 21px;
+    line-height: 1.3;
+}
+.dn-decision h4 {
+    margin: 18px 0 7px;
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.dn-note {
+    white-space: pre-wrap;
+    line-height: 1.6;
+    margin: 5px 0;
+}
+.dn-decision ul {
+    padding-left: 22px;
+}
+.dn-id {
+    font-family: monospace;
+    color: var(--muted);
+    font-size: 11px;
+}
+.dn-badge {
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 600;
+}
+.dn-proposal,
+.dn-due {
+    color: var(--warn);
+}
+.dn-accepted {
+    color: var(--ok);
+}
+.dn-superseded {
+    color: var(--muted);
+}
+.dn-review {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+}
+.dn-empty {
+    padding: 28px 18px;
+    text-align: center;
+    color: var(--muted);
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    line-height: 1.6;
+}
+@media (max-width: 560px) {
+    .dn-page {
+        padding: 16px 12px 40px;
+    }
+    .dn-filters {
+        grid-template-columns: 1fr;
+    }
+    .dn-decision {
+        padding: 16px;
+    }
+    .dn-toolbar > .button {
+        flex: 1;
+    }
+}
